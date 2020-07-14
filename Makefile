@@ -1,3 +1,5 @@
+HOST_IP=$(shell hostname -I | cut -d' ' -f1)
+
 PROJECTNAME := $(shell basename "$(PWD)")
 
 partitions = 1
@@ -10,11 +12,15 @@ help: Makefile
 
 kafka-setup:
 	@echo "Setting up Kafka instances in "$(PROJECTNAME)
-	@docker-compose -f kafka/docker-compose.yaml up -d --scale kafka=2
+	@HOST_IP=$(HOST_IP) docker-compose -f kafka/docker-compose.yaml up -d --scale kafka=2
 	@sh kafka/app/bin/kafka-topics.sh --create --bootstrap-server localhost:9092\
 		--replication-factor 1 --partitions 1 --topic test1
 	@sh kafka/app/bin/kafka-topics.sh --create --bootstrap-server localhost:9092\
 		--replication-factor 3 --partitions 1 --topic test3
+
+kafka-latency:
+	@echo "Running latency test"
+	@sh kafka/app/bin/kafka-run-class.sh kafka.tools.EndToEndLatency localhost:9092 test1 5000 1 1024
 
 kafka-perf-1:
 	@sh kafka/app/bin/kafka-producer-perf-test.sh --topic test1 --num-records 500\
