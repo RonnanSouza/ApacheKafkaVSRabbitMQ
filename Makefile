@@ -1,7 +1,8 @@
-PROJECTNAME := $(shell basename "$(PWD)")
+#!make
+include rabbitmq/cluster/.env
+export $(shell sed 's/=.*//' rabbitmq/cluster/.env)
 
-partitions = 1
-replication = 1
+PROJECTNAME := $(shell basename "$(PWD)")
 
 help: Makefile
 	@echo " Choose a command run in "$(PROJECTNAME)":"
@@ -30,12 +31,19 @@ kafka-perf-consumer:
 	@sh kafka/app/bin/kafka-consumer-perf-test.sh --topic test1 \
 	 --bootstrap-server=localhost:9092 --messages 100
 
-rabbitmq-setup:
-	@echo "Setting up Kafka instances in "$(PROJECTNAME)
-	@docker-compose -f rabbitmq/docker-compose.yaml up -d
+rabbitmq-deps:
+	@echo "Setting up RabbitMQ cluster in "$(PROJECTNAME)
+	@docker network create $(RABBITMQ_DEFAULT_NETWORK)
+	@docker-compose -f rabbitmq/cluster/docker-compose.yml --env-file rabbitmq/cluster/.env up -d
 
-rabbitmq-perf:
+rabbitmq-cluster:
+	@docker exec rmq2 bash -c "rabbitmqctl stop_app;rabbitmqctl reset;rabbitmqctl join_cluster rabbit@rabbitmq1;rabbitmqctl start_app"
+	@docker exec rmq3 bash -c "rabbitmqctl stop_app;rabbitmqctl reset;rabbitmqctl join_cluster rabbit@rabbitmq1;rabbitmqctl start_app"
 
-docker-stop:
-	@docker-compose -f ./kafka/docker-compose.yaml down
-	@docker-compose -f ./rabbitmq/docker-compose.yaml down
+rabbitmq-stop:
+	@echo "Stopping RabbitMQ cluster"
+	@docker-compose -f rabbitmq/cluster/docker-compose.yml down
+	@docker network rm $(RABBITMQ_DEFAULT_NETWORK)
+
+rabbitmq-latency:
+	@timeout 10s docker run --rm --network rabbit-net pivotalrabbitmq/perf-test:latest --uri amqp://proxy
