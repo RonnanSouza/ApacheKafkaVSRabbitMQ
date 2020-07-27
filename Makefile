@@ -1,5 +1,10 @@
 #!make
-HOST_IP=$(shell hostname -I | cut -d' ' -f1)
+UNAME := $(shell uname)
+
+
+HOST_IP=`ifconfig | grep --color=none -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep --color=none -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n 1`
+# HOST_IP=$(shell hostname -I | cut -d' ' -f1)
+
 
 include rabbitmq/cluster/.env
 export $(shell sed 's/=.*//' rabbitmq/cluster/.env)
@@ -18,6 +23,9 @@ kafka-setup:
 		--replication-factor 1 --partitions 1 --topic test1
 	@sh kafka/app/bin/kafka-topics.sh --create --bootstrap-server localhost:9092\
 		--replication-factor 3 --partitions 1 --topic test3
+
+kafka-stop:
+	@@docker-compose -f kafka/docker-compose.yaml down
 
 kafka-latency:
 	@echo "Running latency test"
